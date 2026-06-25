@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Lock In"/>
+<meta name="theme-color" content="#ffffff"/>
+<title>Lock In</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f5f5f5;
+    --card: #f8f8f8;
+    --border: #e8e8e8;
+    --text: #111111;
+    --dim: #666666;
+    --muted: #aaaaaa;
+    --black: #111111;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif; color: var(--text); overscroll-behavior: none; }
+
+  /* ── Layout ── */
+  #app { display: flex; flex-direction: column; height: 100%; padding-top: var(--safe-top); }
+  #header { padding: 20px 20px 0; flex-shrink: 0; }
+  #tabs-wrap { padding: 0 20px; margin-top: 16px; flex-shrink: 0; }
+  #content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 20px calc(20px + var(--safe-bot)); }
+
+  /* ── Header ── */
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .header-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+  .header-title { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+  .header-date { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .streak-badge { display: flex; flex-direction: column; align-items: center; background: var(--black); color: #fff; border-radius: 14px; padding: 8px 14px; }
+  .streak-num { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+  .streak-label { font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #aaa; margin-top: 2px; }
+
+  /* ── Week rings ── */
+  #week-rings { display: flex; gap: 8px; margin-top: 20px; justify-content: space-between; }
+  .ring-day { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1; }
+  .ring-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .ring-label.active { color: var(--black); }
+  .ring-svg { width: 100%; max-width: 42px; }
+
+  /* ── Tabs ── */
+  #tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  #tabs::-webkit-scrollbar { display: none; }
+  .tab { flex-shrink: 0; padding: 7px 14px; border-radius: 99px; font-size: 13px; font-weight: 600; border: 1.5px solid var(--border); background: transparent; color: var(--dim); cursor: pointer; transition: all 0.15s; letter-spacing: -0.01em; }
+  .tab.active { background: var(--black); color: #fff; border-color: var(--black); }
+
+  /* ── Progress bar ── */
+  #progress-wrap { margin-bottom: 18px; }
+  .progress-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .progress-title { font-size: 13px; font-weight: 700; color: var(--text); }
+  .progress-pct { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
+  .progress-bar-bg { height: 4px; background: var(--border); border-radius: 99px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: var(--black); border-radius: 99px; transition: width 0.4s cubic-bezier(.4,0,.2,1); }
+
+  /* ── Section ── */
+  .section { margin-bottom: 24px; }
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; padding-left: 2px; }
+
+  /* ── Task card ── */
+  .task { display: flex; align-items: flex-start; gap: 12px; padding: 13px 14px; background: var(--card); border: 1.5px solid var(--border); border-radius: 14px; margin-bottom: 7px; cursor: pointer; transition: background 0.12s, border-color 0.12s; user-select: none; }
+  .task.done { background: #f0f0f0; }
+  .task.done .task-name { text-decoration: line-through; color: var(--muted); }
+  .task.done .task-time { color: var(--muted); }
+  .task-check { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s; margin-top: 1px; }
+  .task.done .task-check { background: var(--black); border-color: var(--black); }
+  .checkmark { display: none; }
+  .task.done .checkmark { display: block; }
+  .task-body { flex: 1; min-width: 0; }
+  .task-time { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.03em; margin-bottom: 2px; }
+  .task-name { font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: -0.01em; line-height: 1.3; }
+  .task-note { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; display: none; }
+  .task.expanded .task-note { display: block; }
+  .task-dur { font-size: 11px; color: var(--muted); flex-shrink: 0; margin-top: 2px; }
+
+  /* ── Focus card ── */
+  #focus-card { background: var(--black); color: #fff; border-radius: 18px; padding: 18px 20px; margin-bottom: 20px; }
+  .focus-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #666; margin-bottom: 6px; }
+  .focus-quote { font-size: 15px; font-weight: 600; line-height: 1.5; letter-spacing: -0.01em; color: #eee; }
+  .focus-author { font-size: 11px; color: #555; margin-top: 8px; }
+
+  /* ── Stats card ── */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .stat-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 16px; padding: 14px 16px; }
+  .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+  .stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+
+  /* ── Coach tip ── */
+  .coach-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 16px 18px; margin-bottom: 16px; }
+  .coach-title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .coach-item { font-size: 13px; color: var(--dim); line-height: 1.6; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .coach-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+  .coach-item strong { color: var(--text); font-weight: 700; }
+
+  /* ── Reset note ── */
+  .reset-note { text-align: center; font-size: 11px; color: var(--muted); margin-top: 20px; padding-bottom: 4px; }
+
+  /* ── Animations ── */
+  @keyframes pop { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+  .pop { animation: pop 0.2s ease; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div class="header-top">
+      <div>
+        <div class="header-eyebrow">Summer Lock-In</div>
+        <div class="header-title">Day Zero.</div>
+        <div class="header-date" id="date-display"></div>
+      </div>
+      <div class="streak-badge">
+        <div class="streak-num" id="streak-num">0</div>
+        <div class="streak-label">Streak</div>
+      </div>
+    </div>
+    <div id="week-rings"></div>
+  </div>
+
+  <div id="tabs-wrap">
+    <div id="tabs"></div>
+  </div>
+
+  <div id="content"></div>
+</div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const DAY_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+const QUOTES = [
+  ["Hard choices, easy life. Easy choices, hard life.", "Jerzy Gregorek"],
+  ["The secret of getting ahead is getting started.", "Mark Twain"],
+  ["You don't rise to the level of your goals. You fall to the level of your systems.", "James Clear"],
+  ["Don't watch the clock. Do what it does — keep going.", "Sam Levenson"],
+  ["Small daily improvements are the key to staggering long-term results.", "—"],
+  ["Success is the sum of small efforts repeated day in and day out.", "Robert Collier"],
+  ["Discipline is choosing between what you want now and what you want most.", "—"],
+  ["The pain of discipline is far less than the pain of regret.", "—"],
+];
+
+const SCHEDULE = {
+  Mon: {
+    label: "ACT Class Day",
+    note: "Leave 8:45 · Back 11:20 · AP: Chem",
+    sections: [
+      { name: "Morning", tasks: [
+        { time: "7:30", name: "Morning Walk", dur: "30m", note: "Non-negotiable. Sets the tone." },
+        { time: "8:00", name: "Shower + Breakfast + Ready", dur: "45m", note: "Out the door by 8:45." },
+        { time: "8:45", name: "Drive to ACT Class", dur: "15m", note: "Leave with buffer." },
+        { time: "9:00", name: "ACT Class", dur: "2hr", note: "Class 9–11am." },
+        { time: "11:00", name: "Drive Home", dur: "20m", note: "Back by 11:20." },
+        { time: "11:20", name: "Decompress + Snack", dur: "20m", note: "Don't jump into work. Reset first." },
+      ]},
+      { name: "Midday", tasks: [
+        { time: "11:40", name: "ACT Review at Home", dur: "60m", note: "Every wrong answer. No rushing. This is where scores improve." },
+        { time: "12:40", name: "Lunch", dur: "30m", note: "Eat. Step outside if you can." },
+        { time: "1:10", name: "Chess Practice", dur: "30m", note: "Tactics first. Lichess puzzles." },
+        { time: "1:40", name: "DECA Practice", dur: "30m", note: "Treat it like a real round." },
+        { time: "2:10", name: "CCP Gov (async)", dur: "60m", note: "Starts June 25. Lectures + assignments." },
+        { time: "3:10", name: "Rest Break", dur: "10m", note: "Short buffer. Walk around, drink water." },
+      ]},
+      { name: "Afternoon", tasks: [
+        { time: "3:20", name: "First Impression", dur: "90m", note: "Real output only. Outreach, deck, logistics." },
+        { time: "4:50", name: "AP Get-Ahead — Chem", dur: "30m", note: "AP Chemistry today." },
+        { time: "5:20", name: "Guitar + App Building", dur: "40m", note: "Guitar 20min, app 20min. Or all guitar." },
+        { time: "6:00", name: "Workout", dur: "60m", note: "Log it. Progressive overload." },
+        { time: "7:00", name: "Shower + Done ✓", dur: "30m", note: "Everything structured ends here." },
+      ]},
+    ]
+  },
+  Tue: {
+    label: "ACT Class + Scouts",
+    note: "Leave 8:45 · Scouts 6pm · AP: Lang",
+    sections: [
+      { name: "Morning", tasks: [
+        { time: "7:30", name: "Morning Walk", dur: "30m", note: "Non-negotiable." },
+        { time: "8:00", name: "Shower + Breakfast + Ready", dur: "45m", note: "Out the door by 8:45." },
+        { time: "8:45", name: "Drive to ACT Class", dur: "15m" },
+        { time: "9:00", name: "ACT Class", dur: "2hr", note: "Class 9–11am." },
+        { time: "11:00", name: "Drive Home", dur: "20m", note: "Back by 11:20." },
+        { time: "11:20", name: "Decompress + Snack", dur: "20m" },
+      ]},
+      { name: "Midday", tasks: [
+        { time: "11:40", name: "ACT Review at Home", dur: "60m", note: "Every wrong answer." },
+        { time: "12:40", name: "Lunch", dur: "30m" },
+        { time: "1:10", name: "Chess Practice", dur: "30m" },
+        { time: "1:40", name: "DECA Practice", dur: "30m" },
+        { time: "2:10", name: "CCP Gov (async)", dur: "60m", note: "Starts June 25." },
+        { time: "3:10", name: "First Impression", dur: "50m", note: "Shorter today — scouts night. Still get output." },
+        { time: "4:00", name: "AP Get-Ahead — Lang", dur: "30m", note: "AP Lang & Comp today." },
+      ]},
+      { name: "Scouts Night", tasks: [
+        { time: "4:30", name: "Workout", dur: "60m", note: "Done before scouts. No exceptions." },
+        { time: "5:30", name: "Shower + Ready", dur: "25m" },
+        { time: "5:55", name: "Drive to Scouts", dur: "10m" },
+        { time: "6:00", name: "Scouts", dur: "2hr", note: "Merit badge work counts here." },
+        { time: "8:00", name: "Wind Down ✓", dur: "", note: "Early night. Earned." },
+      ]},
+    ]
+  },
+  Wed: {
+    label: "ACT Class Day",
+    note: "Leave 8:45 · Back 11:20 · AP: Spanish",
+    sections: [
+      { name: "Morning", tasks: [
+        { time: "7:30", name: "Morning Walk", dur: "30m", note: "Non-negotiable." },
+        { time: "8:00", name: "Shower + Breakfast + Ready", dur: "45m", note: "Out the door by 8:45." },
+        { time: "8:45", name: "Drive to ACT Class", dur: "15m" },
+        { time: "9:00", name: "ACT Class", dur: "2hr", note: "Class 9–11am." },
+        { time: "11:00", name: "Drive Home", dur: "20m" },
+        { time: "11:20", name: "Decompress + Snack", dur: "20m" },
+      ]},
+      { name: "Midday", tasks: [
+        { time: "11:40", name: "ACT Review at Home", dur: "60m", note: "Every wrong answer." },
+        { time: "12:40", name: "Lunch", dur: "30m" },
+        { time: "1:10", name: "Chess Practice", dur: "30m" },
+        { time: "1:40", name: "DECA Practice", dur: "30m" },
+        { time: "2:10", name: "CCP Gov (async)", dur: "60m", note: "Starts June 25." },
+        { time: "3:10", name: "Rest Break", dur: "10m" },
+      ]},
+      { name: "Afternoon", tasks: [
+        { time: "3:20", name: "First Impression", dur: "90m", note: "Real output only." },
+        { time: "4:50", name: "AP Get-Ahead — Spanish", dur: "30m", note: "Spanish 5 today." },
+        { time: "5:20", name: "Guitar + App Building", dur: "40m" },
+        { time: "6:00", name: "Workout", dur: "60m" },
+        { time: "7:00", name: "Shower + Done ✓", dur: "30m" },
+      ]},
+    ]
+  },
+  Thu: {
+    label: "Self-Study Day",
+    note: "Home all day · AP: Chem",
+    sections: [
+      { name: "Morning", tasks: [
+        { time: "7:30", name: "Morning Walk", dur: "30m", note: "Non-negotiable." },
+        { time: "8:00", name: "Shower + Breakfast", dur: "30m" },
+        { time: "8:30", name: "ACT Self-Study", dur: "1h45m", note: "Full timed sections. Treat it like the real thing." },
+        { time: "10:15", name: "ACT Review", dur: "60m", note: "Every wrong answer immediately after. This is where improvement happens." },
+        { time: "11:15", name: "Rest + Snack", dur: "15m", note: "Intentional break." },
+      ]},
+      { name: "Midday", tasks: [
+        { time: "11:30", name: "Chess Practice", dur: "30m" },
+        { time: "12:00", name: "DECA Practice", dur: "30m" },
+        { time: "12:30", name: "Lunch", dur: "30m" },
+        { time: "1:00", name: "CCP Gov (async)", dur: "60m", note: "Starts June 25." },
+        { time: "2:00", name: "Rest", dur: "10m" },
+        { time: "2:10", name: "First Impression", dur: "90m", note: "Real output only." },
+      ]},
+      { name: "Afternoon", tasks: [
+        { time: "3:40", name: "AP Get-Ahead — Chem", dur: "30m", note: "AP Chemistry today." },
+        { time: "4:10", name: "Guitar + App Building", dur: "40m" },
+        { time: "4:50", name: "Merit Badges (Scouts)", dur: "30m", note: "Dedicated work toward current badge." },
+        { time: "5:20", name: "Workout", dur: "60m" },
+        { time: "6:20", name: "Shower + Done ✓", dur: "30m" },
+      ]},
+    ]
+  },
+  Fri: {
+    label: "Self-Study Day",
+    note: "Home all day · AP: Lang · Finish strong",
+    sections: [
+      { name: "Morning", tasks: [
+        { time: "7:30", name: "Morning Walk", dur: "30m" },
+        { time: "8:00", name: "Shower + Breakfast", dur: "30m" },
+        { time: "8:30", name: "ACT Self-Study", dur: "1h45m", note: "Timed, focused. Finish the week strong." },
+        { time: "10:15", name: "ACT Review", dur: "60m", note: "While it's fresh." },
+        { time: "11:15", name: "Rest + Snack", dur: "15m" },
+      ]},
+      { name: "Midday", tasks: [
+        { time: "11:30", name: "Chess Practice", dur: "30m" },
+        { time: "12:00", name: "DECA Practice", dur: "30m" },
+        { time: "12:30", name: "Lunch", dur: "30m" },
+        { time: "1:00", name: "CCP Gov (async)", dur: "60m", note: "Starts June 25." },
+        { time: "2:00", name: "Rest", dur: "10m" },
+        { time: "2:10", name: "First Impression", dur: "90m" },
+      ]},
+      { name: "Afternoon", tasks: [
+        { time: "3:40", name: "AP Get-Ahead — Lang", dur: "30m", note: "AP Lang & Comp today." },
+        { time: "4:10", name: "Guitar + App Building", dur: "40m" },
+        { time: "4:50", name: "Merit Badges (Scouts)", dur: "30m" },
+        { time: "5:20", name: "Workout", dur: "60m" },
+        { time: "6:20", name: "Shower + Done ✓", dur: "30m", note: "Week complete. Evening is yours." },
+      ]},
+    ]
+  },
+  Sat: {
+    label: "Weekend",
+    note: "Lower pressure · Driving · Free evening",
+    sections: [
+      { name: "Morning", tasks: [
+        { time: "8:00", name: "Sleep In / Wake Naturally", dur: "", note: "No alarm. Earned." },
+        { time: "9:00", name: "Walk + Breakfast", dur: "45m" },
+        { time: "9:45", name: "ACT Practice Test", dur: "90m", note: "Optional. Full timed section." },
+        { time: "11:15", name: "ACT Review", dur: "60m" },
+      ]},
+      { name: "Afternoon", tasks: [
+        { time: "12:15", name: "Driving Practice", dur: "90m", note: "Log your hours." },
+        { time: "1:45", name: "Lunch", dur: "30m" },
+        { time: "2:15", name: "First Impression + Outreach", dur: "60m", note: "Catch up. Professor cold emails." },
+        { time: "3:15", name: "Workout", dur: "60m" },
+        { time: "4:15", name: "Merit Badges", dur: "30m" },
+        { time: "4:45", name: "App Building or Guitar", dur: "45m", note: "Pick one." },
+        { time: "5:30", name: "Shower + Done ✓", dur: "30m", note: "Free from 6pm. Protect it." },
+      ]},
+    ]
+  },
+  Sun: {
+    label: "Reset Day",
+    note: "Plan the week · Protect the evening",
+    sections: [
+      { name: "Morning", tasks: [
+        { time: "8:30", name: "Wake Up + Breakfast", dur: "", note: "No rush." },
+        { time: "9:15", name: "Weekly Planning", dur: "15m", note: "Set 3 priorities. 15 min max." },
+        { time: "9:30", name: "Chess Study", dur: "45m", note: "Openings, annotated games, endgame theory." },
+        { time: "10:15", name: "Driving Practice", dur: "90m" },
+      ]},
+      { name: "Midday", tasks: [
+        { time: "11:45", name: "First Impression + Outreach", dur: "90m", note: "Best day for professor emails. More time to craft." },
+        { time: "1:15", name: "Lunch", dur: "45m" },
+        { time: "2:00", name: "AP Get-Ahead", dur: "60m", note: "Catch up on whatever's lagging." },
+        { time: "3:00", name: "Workout", dur: "60m" },
+        { time: "4:00", name: "Guitar Practice", dur: "30m" },
+        { time: "4:30", name: "Shower + Done ✓", dur: "20m" },
+      ]},
+      { name: "Evening", tasks: [
+        { time: "4:50", name: "Free Time", dur: "2hr", note: "Genuinely free. Recharge for the week." },
+        { time: "6:50", name: "Prep for Monday", dur: "20m", note: "Bag packed, schedule reviewed." },
+        { time: "7:10", name: "Wind Down", dur: "", note: "Phone away by 9pm. Sleep by 9:30." },
+      ]},
+    ]
+  },
+};
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+
+const jsDay = new Date().getDay(); // 0=Sun
+const dayMap = [6,0,1,2,3,4,5];   // js→Mon-index
+let activeDay = dayMap[jsDay];
+
+function getKey(dayIdx) {
+  return `lockin_${DAYS[dayIdx]}_${getTodayStr()}`;
+}
+
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function getWeekKey(dayIdx) {
+  // Completion pct stored per calendar day (Mon of current week)
+  const d = new Date();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - dayMap[jsDay] + dayIdx);
+  return `lockin_pct_${monday.getFullYear()}-${monday.getMonth()}-${monday.getDate()}`;
+}
+
+function loadChecked(dayIdx) {
+  try { return JSON.parse(localStorage.getItem(getKey(dayIdx)) || '[]'); } catch { return []; }
+}
+
+function saveChecked(dayIdx, arr) {
+  localStorage.setItem(getKey(dayIdx), JSON.stringify(arr));
+  // Save pct for week rings
+  const day = SCHEDULE[DAYS[dayIdx]];
+  const total = day.sections.reduce((a,s)=>a+s.tasks.length,0);
+  const pct = total ? Math.round(arr.length/total*100) : 0;
+  localStorage.setItem(getWeekKey(dayIdx), pct);
+}
+
+function loadWeekPcts() {
+  return DAYS.map((_,i) => {
+    const v = localStorage.getItem(getWeekKey(i));
+    return v !== null ? parseInt(v) : null;
+  });
+}
+
+function getStreak() {
+  let streak = 0;
+  const now = new Date();
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(now); d.setDate(now.getDate() - i);
+    const key = `lockin_streak_${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if (localStorage.getItem(key) === '1') streak++;
+    else if (i > 0) break;
+  }
+  return streak;
+}
+
+function markStreakToday() {
+  const d = new Date();
+  const key = `lockin_streak_${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  localStorage.setItem(key, '1');
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+
+function ring(pct, size, isToday) {
+  const r = 14, cx = 18, cy = 18, sw = 3.5;
+  const circ = 2 * Math.PI * r;
+  const dash = pct !== null ? (pct / 100) * circ : 0;
+  const color = isToday ? '#111' : (pct > 0 ? '#555' : '#ddd');
+  const bg = '#ebebeb';
+  return `<svg class="ring-svg" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${bg}" stroke-width="${sw}"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${sw}"
+      stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${circ/4}" stroke-linecap="round"
+      style="transition:stroke-dasharray 0.5s ease"/>
+    <text x="${cx}" y="${cy+1}" text-anchor="middle" dominant-baseline="middle"
+      font-size="9" font-weight="700" fill="${isToday?'#111':'#888'}" font-family="-apple-system,sans-serif">
+      ${pct !== null ? pct+'%' : ''}
+    </text>
+  </svg>`;
+}
+
+function renderHeader() {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+  document.getElementById('date-display').textContent = dateStr;
+
+  const title = document.querySelector('.header-title');
+  const hour = now.getHours();
+  if (hour < 8) title.textContent = 'Rise up.';
+  else if (hour < 12) title.textContent = 'Lock in.';
+  else if (hour < 17) title.textContent = 'Keep going.';
+  else if (hour < 20) title.textContent = 'Finish strong.';
+  else title.textContent = 'Rest earned.';
+
+  document.getElementById('streak-num').textContent = getStreak();
+}
+
+function renderWeekRings() {
+  const pcts = loadWeekPcts();
+  const wrap = document.getElementById('week-rings');
+  wrap.innerHTML = DAYS.map((d, i) => {
+    const isToday = i === dayMap[jsDay];
+    return `<div class="ring-day" onclick="switchDay(${i})">
+      ${ring(pcts[i], 36, isToday)}
+      <div class="ring-label${isToday?' active':''}">${d}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTabs() {
+  const wrap = document.getElementById('tabs');
+  wrap.innerHTML = DAYS.map((d,i) => {
+    const isToday = i === dayMap[jsDay];
+    return `<button class="tab${i===activeDay?' active':''}" onclick="switchDay(${i})">${d}${isToday?' ·':''}</button>`;
+  }).join('');
+}
+
+function renderContent() {
+  const key = DAYS[activeDay];
+  const day = SCHEDULE[key];
+  const checked = loadChecked(activeDay);
+  const totalTasks = day.sections.reduce((a,s)=>a+s.tasks.length,0);
+  const doneTasks = checked.length;
+  const pct = totalTasks ? Math.round(doneTasks/totalTasks*100) : 0;
+  const isToday = activeDay === dayMap[jsDay];
+
+  const q = QUOTES[new Date().getDay() % QUOTES.length];
+
+  let html = '';
+
+  // Focus card
+  html += `<div id="focus-card">
+    <div class="focus-eyebrow">Today's mindset</div>
+    <div class="focus-quote">"${q[0]}"</div>
+    <div class="focus-author">— ${q[1]}</div>
+  </div>`;
+
+  // Progress
+  html += `<div id="progress-wrap">
+    <div class="progress-header">
+      <div class="progress-title">${DAY_FULL[activeDay]} · ${day.label}</div>
+      <div class="progress-pct">${pct}%</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">${day.note}</div>
+    <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+  </div>`;
+
+  // Stats
+  html += `<div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value">${doneTasks}/${totalTasks}</div>
+      <div class="stat-label">Tasks done</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${getStreak()}</div>
+      <div class="stat-label">Day streak</div>
+    </div>
+  </div>`;
+
+  // Sections + tasks
+  day.sections.forEach((section, si) => {
+    html += `<div class="section"><div class="section-label">${section.name}</div>`;
+    section.tasks.forEach((task, ti) => {
+      const id = `${si}-${ti}`;
+      const done = checked.includes(id);
+      html += `<div class="task${done?' done':''}" id="task-${id}" onclick="toggleTask('${id}','${key}')">
+        <div class="task-check">
+          <svg class="checkmark" width="11" height="9" viewBox="0 0 11 9" fill="none">
+            <path d="M1 4L4 7.5L10 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="task-body">
+          <div class="task-time">${task.time}</div>
+          <div class="task-name">${task.name}</div>
+          ${task.note ? `<div class="task-note">${task.note}</div>` : ''}
+        </div>
+        <div class="task-dur">${task.dur}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  // Coach notes
+  html += `<div class="coach-card">
+    <div class="coach-title">Coach Notes</div>
+    <div class="coach-item"><strong>ACT Review</strong> — 60 min on all ACT days. Every wrong answer. This is where scores go from 32 to 35.</div>
+    <div class="coach-item"><strong>Professor Outreach</strong> — Live inside First Impression time Mon/Wed/Sun. Draft, edit, send. Don't wait for perfect.</div>
+    <div class="coach-item"><strong>Sleep</strong> — Phone away 9pm, out by 10. The schedule only works if you sleep.</div>
+    <div class="coach-item"><strong>Tap any task</strong> to expand notes. Tap again to collapse.</div>
+  </div>`;
+
+  html += `<div class="reset-note">Checkboxes auto-reset each day at midnight</div>`;
+
+  document.getElementById('content').innerHTML = html;
+
+  // Long-press to expand note
+  document.querySelectorAll('.task').forEach(el => {
+    let timer;
+    el.addEventListener('touchstart', () => { timer = setTimeout(() => el.classList.toggle('expanded'), 400); }, {passive:true});
+    el.addEventListener('touchend', () => clearTimeout(timer), {passive:true});
+  });
+}
+
+function toggleTask(id, dayKey) {
+  // Don't fire if expanding note
+  const dayIdx = DAYS.indexOf(dayKey);
+  let checked = loadChecked(dayIdx);
+  const taskEl = document.getElementById(`task-${id}`);
+
+  if (checked.includes(id)) {
+    checked = checked.filter(x => x !== id);
+    taskEl.classList.remove('done');
+  } else {
+    checked.push(id);
+    taskEl.classList.add('done');
+    taskEl.classList.add('pop');
+    setTimeout(() => taskEl.classList.remove('pop'), 200);
+  }
+
+  saveChecked(dayIdx, checked);
+
+  // Update progress bar + pct
+  const day = SCHEDULE[dayKey];
+  const total = day.sections.reduce((a,s)=>a+s.tasks.length,0);
+  const pct = total ? Math.round(checked.length/total*100) : 0;
+  document.querySelector('.progress-bar-fill').style.width = pct + '%';
+  document.querySelector('.progress-pct').textContent = pct + '%';
+  document.querySelector('.stat-value').textContent = `${checked.length}/${total}`;
+
+  if (pct === 100) markStreakToday();
+  renderWeekRings();
+  document.getElementById('streak-num').textContent = getStreak();
+}
+
+function switchDay(idx) {
+  activeDay = idx;
+  renderTabs();
+  renderContent();
+  document.getElementById('content').scrollTop = 0;
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+
+renderHeader();
+renderWeekRings();
+renderTabs();
+renderContent();
+</script>
+</body>
+</html>
