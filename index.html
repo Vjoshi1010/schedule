@@ -177,7 +177,6 @@ html, body {
   </div>
 
   <div id="scroll-body">
-    <!-- Score -->
     <div id="score-hero">
       <div class="score-row">
         <div class="score-big" id="score-display">—</div>
@@ -187,7 +186,6 @@ html, body {
       <div class="score-bar-bg"><div class="score-bar-fill" id="score-bar" style="width:0%"></div></div>
     </div>
 
-    <!-- Graph -->
     <div id="graph-wrap">
       <div class="section-div" style="margin:20px 0 0"></div>
       <div style="padding:20px 0 0">
@@ -196,20 +194,17 @@ html, body {
       </div>
     </div>
 
-    <!-- Recommendation -->
     <div id="rec-card">
       <div class="rec-eyebrow">Up next</div>
       <div class="rec-text" id="rec-text"></div>
     </div>
 
-    <!-- Tasks -->
     <div id="tasks-wrap">
       <div class="section-div" style="margin:0 0 0 0; margin-bottom:16px"></div>
       <div class="section-eyebrow">Today's tasks</div>
       <div id="task-list"></div>
     </div>
 
-    <!-- Chat -->
     <div class="section-div"></div>
     <div id="chat-log"></div>
     <div style="height:20px"></div>
@@ -268,8 +263,8 @@ function getDefaultTasks() {
     base.push({ id:'review',  name:'ACT Review',             sub:'11:40 · 60 min — every wrong answer',tag:'college',done:false });
   } else if (!isWeekend) {
     base.push({ id:'actstudy',name:'ACT Self-Study',         sub:'8:30 · 1h45m timed',    tag:'college',  done:false });
-    base.push({ id:'review',  name:'ACT Review',             sub:'10:15 · 60 min',         tag:'college',  done:false });
-    base.push({ id:'rest1',   name:'Rest + Snack',           sub:'11:15 · 15 min',         tag:'rest',     done:false });
+    base.push({ id:'review',  name:'ACT Review',             sub:'10:15 · 60 min',        tag:'college',  done:false });
+    base.push({ id:'rest1',   name:'Rest + Snack',           sub:'11:15 · 15 min',        tag:'rest',     done:false });
   }
   if (!isWeekend) {
     base.push({ id:'lunch',   name:'Lunch',                  sub:'~12:30',                tag:'routine',  done:false });
@@ -289,7 +284,7 @@ function getDefaultTasks() {
   }
   if (isWeekend) {
     base.push({ id:'walk2',   name:'Walk + Breakfast',       sub:'9:00 · relax',          tag:'fitness',  done:false });
-    base.push({ id:'driving', name:'Driving Practice',       sub:'Log your hours',         tag:'logistics',done:false });
+    base.push({ id:'driving', name:'Driving Practice',       sub:'Log your hours',          tag:'logistics',done:false });
     base.push({ id:'fi2',     name:'First Impression + Outreach',sub:'Professor emails',  tag:'research', done:false });
     base.push({ id:'workout', name:'Workout',                sub:'60 min',                tag:'fitness',  done:false });
     base.push({ id:'merit',   name:'Merit Badges',           sub:'30 min',                tag:'scouts',   done:false });
@@ -388,7 +383,6 @@ function drawGraph() {
 
   // Dots + labels
   pts.forEach((p, i) => {
-    // x label every 2
     if (i % 2 === 0 || i === 13) {
       ctx.fillStyle = '#aaaaaa'; ctx.font = `500 8px -apple-system,sans-serif`;
       ctx.textAlign = 'center'; ctx.fillText(p.label, p.x, H - 4);
@@ -404,15 +398,12 @@ function drawGraph() {
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 function renderAll() {
-  // Title by time
   const h = new Date().getHours();
   document.getElementById('tb-title').textContent =
     h < 9 ? 'Rise up.' : h < 12 ? 'Lock in.' : h < 17 ? 'Keep going.' : h < 20 ? 'Finish strong.' : 'Rest earned.';
 
-  // Streak
   document.getElementById('streak-val').textContent = getStreak();
 
-  // Score
   const sc = S.get(KEY_SCORE());
   const scoreEl = document.getElementById('score-display');
   const labelEl = document.getElementById('score-label');
@@ -427,7 +418,6 @@ function renderAll() {
     labelEl.textContent = 'No updates yet today';
   }
 
-  // Rec card
   const recText = S.get(KEY_REC);
   const recCard = document.getElementById('rec-card');
   if (recText) {
@@ -437,13 +427,8 @@ function renderAll() {
     recCard.style.display = 'none';
   }
 
-  // Tasks
   renderTasks();
-
-  // Chat
   renderChat();
-
-  // Graph
   drawGraph();
 }
 
@@ -478,18 +463,30 @@ function renderChat() {
       <div class="msg-time">${m.time}</div>
     </div>
   `).join('');
-  // scroll to bottom
   setTimeout(() => {
     const sb = document.getElementById('scroll-body');
     sb.scrollTop = sb.scrollHeight;
   }, 50);
 }
 
-// ─── SEND MESSAGE ─────────────────────────────────────────────────────────────
+// ─── SEND MESSAGE (SECURE STORAGE LOGIC) ─────────────────────────────────────
 async function sendMessage() {
   const input = document.getElementById('msg-input');
   const text = input.value.trim();
   if (!text || sending) return;
+
+  // Retrieve or request the user's Gemini key securely at runtime
+  let GEMINI_API_KEY = localStorage.getItem('user_gemini_key');
+  if (!GEMINI_API_KEY) {
+    GEMINI_API_KEY = prompt("Please enter your new Gemini API Key (Starts with AIzaSy):");
+    if (GEMINI_API_KEY) {
+      localStorage.setItem('user_gemini_key', GEMINI_API_KEY.trim());
+    } else {
+      alert("An API key is required to connect to the AI coach.");
+      return;
+    }
+  }
+
   sending = true;
   document.getElementById('send-btn').disabled = true;
   input.value = '';
@@ -500,7 +497,6 @@ async function sendMessage() {
   S.set(KEY_CHAT(), chat);
   renderChat();
 
-  // Typing indicator
   const log = document.getElementById('chat-log');
   const typingEl = document.createElement('div');
   typingEl.className = 'msg-ai';
@@ -511,22 +507,17 @@ async function sendMessage() {
 
   try {
     const systemPrompt = buildSystemPrompt();
-    const messages = buildMessages(text);
+    const contents = buildGeminiContents(text, systemPrompt);
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages,
-      })
+      body: JSON.stringify({ contents })
     });
+    
     const data = await res.json();
-    const raw = data.content?.[0]?.text || '';
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    // Parse JSON from response
     let parsed;
     try {
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -536,11 +527,9 @@ async function sendMessage() {
     typingEl.remove();
 
     if (parsed) {
-      // Update score
       if (parsed.score !== undefined && parsed.score !== null) {
         const newScore = Math.min(10, Math.max(0, parseFloat(parsed.score)));
         S.set(KEY_SCORE(), newScore);
-        // Save to history
         const hist = S.get(KEY_HIST) || [];
         const existing = hist.findIndex(h => h.date === todayStr());
         if (existing >= 0) hist[existing].score = newScore;
@@ -549,7 +538,6 @@ async function sendMessage() {
         score = newScore;
       }
 
-      // Update tasks
       if (parsed.completedTasks && Array.isArray(parsed.completedTasks)) {
         parsed.completedTasks.forEach(id => {
           const t = tasks.find(t => t.id === id);
@@ -566,10 +554,8 @@ async function sendMessage() {
       }
       S.set(KEY_TASKS(), tasks);
 
-      // Rec
       if (parsed.recommendation) S.set(KEY_REC, parsed.recommendation);
 
-      // Message
       const reply = parsed.message || 'Got it.';
       chat.push({ role:'ai', text: reply, time: now });
     } else {
@@ -580,7 +566,7 @@ async function sendMessage() {
     renderAll();
   } catch (e) {
     typingEl.remove();
-    chat.push({ role:'ai', text: 'Something went wrong — check your connection and try again.', time: now });
+    chat.push({ role:'ai', text: 'Something went wrong — check your connection or key and try again.', time: now });
     S.set(KEY_CHAT(), chat);
     renderChat();
   }
@@ -589,7 +575,7 @@ async function sendMessage() {
   document.getElementById('send-btn').disabled = false;
 }
 
-// ─── PROMPT BUILDER ───────────────────────────────────────────────────────────
+// ─── PROMPT BUILDERS FOR GEMINI ────────────────────────────────────────────────
 function buildSystemPrompt() {
   const dow = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
   const isACT = ['Monday','Tuesday','Wednesday'].includes(dow);
@@ -603,7 +589,7 @@ Current productivity score: ${curScore !== null ? curScore : 'not set yet'}/10
 Current tasks:
 ${taskList}
 
-Your job: When Vihaan tells you what he's done or what's happening, respond with a JSON object ONLY — no text outside it. The JSON must have these keys:
+Your job: When Vihaan tells you what he's done or what's happening, respond with a JSON object ONLY — no markdown wrappers, no text outside it. The JSON must have these keys:
 - "message": string — your response (2-4 sentences, direct, coach-like, no fluff, reference specifics)
 - "score": number or null — updated productivity score 0-10 with one decimal (e.g. 7.4). Be honest — a great day where he did everything is 9-10, average is 5-6, skipped key stuff is 3-4. Null if not enough info yet.
 - "completedTasks": array of task IDs to mark done based on what he said
@@ -621,14 +607,22 @@ Scoring rubric (rough guide):
 Be real with him. Don't sugarcoat a bad day. If he's crushing it, say so. Keep it short and punchy.`;
 }
 
-function buildMessages(newText) {
-  const history = chat.slice(-10); // last 10 messages for context
-  const msgs = history.slice(0, -1).map(m => ({
-    role: m.role === 'user' ? 'user' : 'assistant',
-    content: m.text
-  }));
-  msgs.push({ role: 'user', content: newText });
-  return msgs;
+function buildGeminiContents(newText, systemPrompt) {
+  const history = chat.slice(-10);
+  const contents = [];
+  
+  contents.push({ role: 'user', parts: [{ text: `SYSTEM INSTRUCTIONS: ${systemPrompt}` }] });
+  contents.push({ role: 'model', parts: [{ text: "Understood. I will act strictly according to those parameters and return valid JSON data only." }] });
+
+  history.slice(0, -1).forEach(m => {
+    contents.push({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.text }]
+    });
+  });
+
+  contents.push({ role: 'user', parts: [{ text: newText }] });
+  return contents;
 }
 
 // ─── INPUT AUTO-RESIZE ────────────────────────────────────────────────────────
