@@ -535,13 +535,25 @@ async function sendMessage() {
         'X-Title': 'Lock In Tracker'
       },
       body: JSON.stringify({
-        model: 'google/gemini-flash-1.5',
+        model: 'google/gemini-2.5-flash',
         messages: messages,
         response_format: { type: 'json_object' }
       })
     });
     
     const data = await res.json();
+
+    // Catch API errors directly from OpenRouter and show them in chat
+    if (data.error) {
+      typingEl.remove();
+      chat.push({ role:'ai', text: `OpenRouter Error: ${data.error.message || JSON.stringify(data.error)}`, time: now });
+      S.set(KEY_CHAT(), chat);
+      renderChat();
+      sending = false;
+      document.getElementById('send-btn').disabled = false;
+      return;
+    }
+
     const raw = data.choices?.[0]?.message?.content || '';
 
     let parsed;
@@ -585,7 +597,7 @@ async function sendMessage() {
       const reply = parsed.message || 'Got it.';
       chat.push({ role:'ai', text: reply, time: now });
     } else {
-      chat.push({ role:'ai', text: raw || 'Got it, updating your day.', time: now });
+      chat.push({ role:'ai', text: raw || 'Error: Model did not return data in the correct format.', time: now });
     }
 
     S.set(KEY_CHAT(), chat);
