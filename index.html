@@ -469,18 +469,26 @@ function renderChat() {
   }, 50);
 }
 
-// ─── SEND MESSAGE (SECURE STORAGE LOGIC) ─────────────────────────────────────
+// ─── SEND MESSAGE (OPENROUTER HANDLING) ───────────────────────────────────────
 async function sendMessage() {
   const input = document.getElementById('msg-input');
   const text = input.value.trim();
   if (!text || sending) return;
 
-  // Retrieve or request the user's Gemini key securely at runtime
-  let GEMINI_API_KEY = localStorage.getItem('user_gemini_key');
-  if (!GEMINI_API_KEY) {
-    GEMINI_API_KEY = prompt("Please enter your new Gemini API Key (Starts with AIzaSy):");
-    if (GEMINI_API_KEY) {
-      localStorage.setItem('user_gemini_key', GEMINI_API_KEY.trim());
+  // Custom diagnostic override
+  if (text === '/clearkey') {
+    localStorage.removeItem('user_gemini_key');
+    alert("Saved API key cleared. Refresh your page.");
+    input.value = '';
+    return;
+  }
+
+  // Retrieve or request the user's OpenRouter key securely at runtime
+  let OPENROUTER_API_KEY = localStorage.getItem('user_gemini_key');
+  if (!OPENROUTER_API_KEY) {
+    OPENROUTER_API_KEY = prompt("Please enter your OpenRouter API Key (Starts with sk-or-v1):");
+    if (OPENROUTER_API_KEY) {
+      localStorage.setItem('user_gemini_key', OPENROUTER_API_KEY.trim());
     } else {
       alert("An API key is required to connect to the AI coach.");
       return;
@@ -507,16 +515,34 @@ async function sendMessage() {
 
   try {
     const systemPrompt = buildSystemPrompt();
-    const contents = buildGeminiContents(text, systemPrompt);
+    
+    // Format history for OpenRouter (Standard OpenAI structural format)
+    const messages = [{ role: 'system', content: systemPrompt }];
+    chat.slice(-10, -1).forEach(m => {
+      messages.push({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.text
+      });
+    });
+    messages.push({ role: 'user', content: text });
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents })
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'HTTP-Referer': window.location.href,
+        'X-Title': 'Lock In Tracker'
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-flash-1.5',
+        messages: messages,
+        response_format: { type: 'json_object' }
+      })
     });
     
     const data = await res.json();
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const raw = data.choices?.[0]?.message?.content || '';
 
     let parsed;
     try {
@@ -575,7 +601,7 @@ async function sendMessage() {
   document.getElementById('send-btn').disabled = false;
 }
 
-// ─── PROMPT BUILDERS FOR GEMINI ────────────────────────────────────────────────
+// ─── PROMPT BUILDERS FOR THE AGENT ─────────────────────────────────────────────
 function buildSystemPrompt() {
   const dow = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
   const isACT = ['Monday','Tuesday','Wednesday'].includes(dow);
@@ -606,38 +632,6 @@ Scoring rubric (rough guide):
 
 Be real with him. Don't sugarcoat a bad day. If he's crushing it, say so. Keep it short and punchy.`;
 }
-
-function buildGeminiContents(newText, systemPrompt) {
-  const history = chat.slice(-10);
-  const contents = [];
-  
-  contents.push({ role: 'user', parts: [{ text: `SYSTEM INSTRUCTIONS: ${systemPrompt}` }] });
-  contents.push({ role: 'model', parts: [{ text: "Understood. I will act strictly according to those parameters and return valid JSON data only." }] });
-
-  history.slice(0, -1).forEach(m => {
-    contents.push({
-      role: m.role === 'user' ? 'user' : 'model',
-      parts: [{ text: m.text }]
-    });
-  });
-
-  contents.push({ role: 'user', parts: [{ text: newText }] });
-  return contents;
-}
-
-// ─── INPUT AUTO-RESIZE ────────────────────────────────────────────────────────
-const input = document.getElementById('msg-input');
-input.addEventListener('input', () => {
-  input.style.height = 'auto';
-  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-});
-input.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-});
-
-// ─── INIT ─────────────────────────────────────────────────────────────────────
-window.addEventListener('resize', drawGraph);
-renderAll();
 </script>
 </body>
 </html>
