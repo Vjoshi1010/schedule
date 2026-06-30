@@ -1,649 +1,296 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="Lock In"/>
-<meta name="theme-color" content="#ffffff"/>
-<title>Lock In</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-:root {
-  --bg: #ffffff;
-  --card: #f7f7f7;
-  --border: #ebebeb;
-  --text: #111111;
-  --dim: #555555;
-  --muted: #aaaaaa;
-  --black: #111111;
-  --safe-top: env(safe-area-inset-top, 44px);
-  --safe-bot: env(safe-area-inset-bottom, 20px);
-}
-html, body {
-  height: 100%; background: var(--bg);
-  font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
-  color: var(--text); overscroll-behavior: none;
-}
+import { useState, useEffect, useRef, useCallback } from "react";
 
-/* ── Shell ── */
-#shell { display: flex; flex-direction: column; height: 100%; }
-#topbar {
-  padding: calc(var(--safe-top) + 10px) 20px 14px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0; background: #fff;
-  position: sticky; top: 0; z-index: 10;
-}
-#scroll-body {
-  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-  padding: 0 0 calc(var(--safe-bot) + 80px);
-}
-
-/* ── Topbar ── */
-.tb-row { display: flex; justify-content: space-between; align-items: center; }
-.tb-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
-.tb-title { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
-.streak-pill {
-  display: flex; align-items: center; gap: 6px;
-  background: var(--black); color: #fff;
-  border-radius: 99px; padding: 6px 13px;
-}
-.streak-fire { font-size: 14px; }
-.streak-val { font-size: 15px; font-weight: 800; letter-spacing: -0.02em; }
-.streak-lbl { font-size: 10px; color: #888; font-weight: 600; letter-spacing: 0.04em; }
-
-/* ── Score hero ── */
-#score-hero {
-  padding: 24px 20px 0;
-}
-.score-row { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 4px; }
-.score-big { font-size: 64px; font-weight: 800; letter-spacing: -0.05em; line-height: 1; }
-.score-denom { font-size: 20px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
-.score-label { font-size: 13px; color: var(--dim); font-weight: 500; }
-.score-bar-bg { height: 3px; background: var(--border); border-radius: 99px; margin-top: 14px; overflow: hidden; }
-.score-bar-fill { height: 100%; background: var(--black); border-radius: 99px; transition: width 0.6s cubic-bezier(.4,0,.2,1); }
-
-/* ── Graph ── */
-#graph-wrap { padding: 24px 20px 0; }
-.section-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
-#graph-canvas { width: 100%; height: 120px; display: block; }
-
-/* ── Tasks ── */
-#tasks-wrap { padding: 20px 20px 0; }
-.task-item {
-  display: flex; align-items: flex-start; gap: 11px;
-  padding: 12px 14px; background: var(--card);
-  border: 1.5px solid var(--border); border-radius: 13px;
-  margin-bottom: 7px; transition: opacity 0.2s;
-}
-.task-item.done { opacity: 0.45; }
-.task-item.done .task-name { text-decoration: line-through; }
-.task-check {
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 1.5px solid var(--border); flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  margin-top: 1px; transition: all 0.15s;
-}
-.task-item.done .task-check { background: var(--black); border-color: var(--black); }
-.chk { display: none; }
-.task-item.done .chk { display: block; }
-.task-text { flex: 1; }
-.task-name { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; }
-.task-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.task-tag {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--muted);
-  background: var(--border); border-radius: 5px;
-  padding: 2px 7px; flex-shrink: 0; margin-top: 2px;
-}
-
-/* ── Recommendation card ── */
-#rec-card {
-  margin: 20px 20px 0;
-  background: var(--black); color: #fff;
-  border-radius: 16px; padding: 16px 18px;
-  display: none;
-}
-.rec-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #555; margin-bottom: 6px; }
-.rec-text { font-size: 14px; font-weight: 500; line-height: 1.6; color: #ddd; }
-
-/* ── Chat log ── */
-#chat-log { padding: 20px 20px 0; display: flex; flex-direction: column; gap: 10px; }
-.msg-user {
-  align-self: flex-end; background: var(--black); color: #fff;
-  border-radius: 18px 18px 4px 18px; padding: 10px 14px;
-  font-size: 14px; line-height: 1.5; max-width: 85%;
-}
-.msg-ai {
-  align-self: flex-start; background: var(--card);
-  border: 1.5px solid var(--border);
-  border-radius: 18px 18px 18px 4px; padding: 10px 14px;
-  font-size: 14px; line-height: 1.6; color: var(--text); max-width: 92%;
-}
-.msg-time { font-size: 10px; color: var(--muted); margin-top: 4px; text-align: right; }
-.msg-ai .msg-time { text-align: left; }
-.typing-dot { display: inline-block; width: 6px; height: 6px; background: var(--muted); border-radius: 50%; animation: blink 1.2s infinite; margin: 0 2px; }
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
-@keyframes blink { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
-
-/* ── Input bar ── */
-#input-bar {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: #fff; border-top: 1px solid var(--border);
-  padding: 10px 16px calc(10px + var(--safe-bot));
-  display: flex; gap: 10px; align-items: flex-end; z-index: 20;
-}
-#msg-input {
-  flex: 1; background: var(--card); border: 1.5px solid var(--border);
-  border-radius: 20px; padding: 10px 16px;
-  font-size: 15px; font-family: inherit; color: var(--text);
-  resize: none; outline: none; max-height: 120px; line-height: 1.4;
-  -webkit-appearance: none;
-}
-#msg-input::placeholder { color: var(--muted); }
-#send-btn {
-  width: 40px; height: 40px; border-radius: 50%;
-  background: var(--black); border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: opacity 0.15s;
-}
-#send-btn:disabled { opacity: 0.3; }
-#send-btn svg { width: 16px; height: 16px; }
-
-/* ── Divider ── */
-.section-div { height: 1px; background: var(--border); margin: 24px 20px 0; }
-
-/* ── Empty state ── */
-.empty-hint {
-  text-align: center; color: var(--muted); font-size: 13px;
-  padding: 20px; line-height: 1.6;
-}
-</style>
-</head>
-<body>
-<div id="shell">
-  <div id="topbar">
-    <div class="tb-eyebrow">Summer Lock-In</div>
-    <div class="tb-row">
-      <div class="tb-title" id="tb-title">Lock in.</div>
-      <div class="streak-pill">
-        <span class="streak-fire">🔥</span>
-        <span class="streak-val" id="streak-val">0</span>
-        <span class="streak-lbl">streak</span>
-      </div>
-    </div>
-  </div>
-
-  <div id="scroll-body">
-    <div id="score-hero">
-      <div class="score-row">
-        <div class="score-big" id="score-display">—</div>
-        <div class="score-denom">/10</div>
-      </div>
-      <div class="score-label" id="score-label">No updates yet today</div>
-      <div class="score-bar-bg"><div class="score-bar-fill" id="score-bar" style="width:0%"></div></div>
-    </div>
-
-    <div id="graph-wrap">
-      <div class="section-div" style="margin:20px 0 0"></div>
-      <div style="padding:20px 0 0">
-        <div class="section-eyebrow">Productivity — last 14 days</div>
-        <canvas id="graph-canvas"></canvas>
-      </div>
-    </div>
-
-    <div id="rec-card">
-      <div class="rec-eyebrow">Up next</div>
-      <div class="rec-text" id="rec-text"></div>
-    </div>
-
-    <div id="tasks-wrap">
-      <div class="section-div" style="margin:0 0 0 0; margin-bottom:16px"></div>
-      <div class="section-eyebrow">Today's tasks</div>
-      <div id="task-list"></div>
-    </div>
-
-    <div class="section-div"></div>
-    <div id="chat-log"></div>
-    <div style="height:20px"></div>
-  </div>
-
-  <div id="input-bar">
-    <textarea id="msg-input" placeholder="Tell me what you've done, what's coming up…" rows="1"></textarea>
-    <button id="send-btn" onclick="sendMessage()">
-      <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M8 13V3M3 8l5-5 5 5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </button>
-  </div>
-</div>
-
-<script>
-// ─── STORAGE ──────────────────────────────────────────────────────────────────
-const S = {
+const LS = {
   get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+  set: (k,v) => localStorage.setItem(k, JSON.stringify(v)),
 };
-const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
-const KEY_CHAT   = () => `lockin_chat_${todayStr()}`;
-const KEY_TASKS  = () => `lockin_tasks_${todayStr()}`;
-const KEY_SCORE  = () => `lockin_score_${todayStr()}`;
-const KEY_REC    = 'lockin_rec';
-const KEY_STREAK = 'lockin_streak';
-const KEY_HIST   = 'lockin_history'; // [{date, score}]
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
 
-// ─── STATE ────────────────────────────────────────────────────────────────────
-let chat    = S.get(KEY_CHAT())  || [];
-let tasks   = S.get(KEY_TASKS()) || getDefaultTasks();
-let score   = S.get(KEY_SCORE()) ?? null;
-let rec     = S.get(KEY_REC)     || '';
-let history = S.get(KEY_HIST)    || [];
-let sending = false;
+const DOW = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-// ─── DEFAULT TASKS ────────────────────────────────────────────────────────────
-function getDefaultTasks() {
-  const dow = new Date().getDay(); // 0=Sun
-  const isACT = [1,2,3].includes(dow); // Mon/Tue/Wed
+function getDayTasks() {
+  const dow = new Date().getDay();
+  const isACT = [1,2,3].includes(dow);
   const isTue = dow === 2;
   const isWeekend = dow === 0 || dow === 6;
-  const isThu = dow === 4;
-  const isFri = dow === 5;
-
   const base = [
-    { id:'walk',    name:'Morning Walk',           sub:'7:30 · 30 min',         tag:'fitness',  done:false },
-    { id:'shower',  name:'Shower + Breakfast',      sub:'8:00 · 45 min',         tag:'routine',  done:false },
+    { id:"walk", name:"Morning Walk", time:"7:30" },
   ];
   if (isACT) {
-    base.push({ id:'drive1',  name:'Drive to ACT Class',    sub:'8:45 · leave now',      tag:'logistics',done:false });
-    base.push({ id:'act',     name:'ACT Class',              sub:'9:00–11:00am',          tag:'college',  done:false });
-    base.push({ id:'drive2',  name:'Drive Home',             sub:'11:00 · back by 11:20', tag:'logistics',done:false });
-    base.push({ id:'decomp',  name:'Decompress + Snack',     sub:'11:20 · 20 min',        tag:'rest',     done:false });
-    base.push({ id:'review',  name:'ACT Review',             sub:'11:40 · 60 min — every wrong answer',tag:'college',done:false });
+    base.push({ id:"act",    name:"ACT Class",           time:"9:00"  });
+    base.push({ id:"review", name:"ACT Review (60 min)", time:"11:40" });
   } else if (!isWeekend) {
-    base.push({ id:'actstudy',name:'ACT Self-Study',         sub:'8:30 · 1h45m timed',    tag:'college',  done:false });
-    base.push({ id:'review',  name:'ACT Review',             sub:'10:15 · 60 min',        tag:'college',  done:false });
-    base.push({ id:'rest1',   name:'Rest + Snack',           sub:'11:15 · 15 min',        tag:'rest',     done:false });
+    base.push({ id:"study",  name:"ACT Self-Study",      time:"8:30"  });
+    base.push({ id:"review", name:"ACT Review (60 min)", time:"10:15" });
   }
   if (!isWeekend) {
-    base.push({ id:'lunch',   name:'Lunch',                  sub:'~12:30',                tag:'routine',  done:false });
-    base.push({ id:'chess',   name:'Chess Practice',         sub:'30 min · tactics first',tag:'extra',    done:false });
-    base.push({ id:'deca',    name:'DECA Practice',          sub:'30 min · treat it real', tag:'extra',    done:false });
-    base.push({ id:'ccp',     name:'CCP Gov (async)',        sub:'60 min · starts June 25',tag:'academics',done:false });
-    base.push({ id:'fi',      name:'First Impression',       sub: isTue ? '50 min · scouts tonight' : '90 min · real output only', tag:'research', done:false });
-    base.push({ id:'ap',      name:'AP Get-Ahead',           sub:'30 min · rotate subjects',tag:'academics',done:false });
-    base.push({ id:'guitar',  name:'Guitar + App Building',  sub:'40 min',                tag:'creative', done:false });
-    if (isThu || isFri) base.push({ id:'merit', name:'Merit Badges', sub:'30 min', tag:'scouts', done:false });
+    base.push({ id:"chess",    name:"Chess Practice",    time:"1:10" });
+    base.push({ id:"ccp",      name:"CCP Gov (async)",   time:"2:10" });
+    base.push({ id:"research", name:"Research Outreach", time:"3:00" });
+    base.push({ id:"fi",       name:"First Impression",  time:"3:20" });
+    base.push({ id:"ap",       name:"AP Get-Ahead",      time:"4:50" });
+    base.push({ id:"merit",    name:"Merit Badges",      time:"5:00" });
+    base.push({ id:"guitar",   name:"Guitar + App",      time:"5:20" });
+    base.push({ id:"workout",  name:"Workout",           time:isTue ? "4:30" : "6:00" });
   }
-  if (!isWeekend) {
-    base.push({ id:'workout', name:'Workout',                sub: isTue ? '4:30 · done before scouts' : '6:00 · log it', tag:'fitness', done:false });
-  }
-  if (isTue) {
-    base.push({ id:'scouts',  name:'Scouts',                 sub:'6:00pm · 2 hrs',        tag:'scouts',   done:false });
-  }
+  if (isTue) base.push({ id:"scouts", name:"Scouts", time:"6:00pm" });
   if (isWeekend) {
-    base.push({ id:'walk2',   name:'Walk + Breakfast',       sub:'9:00 · relax',          tag:'fitness',  done:false });
-    base.push({ id:'driving', name:'Driving Practice',       sub:'Log your hours',          tag:'logistics',done:false });
-    base.push({ id:'fi2',     name:'First Impression + Outreach',sub:'Professor emails',  tag:'research', done:false });
-    base.push({ id:'workout', name:'Workout',                sub:'60 min',                tag:'fitness',  done:false });
-    base.push({ id:'merit',   name:'Merit Badges',           sub:'30 min',                tag:'scouts',   done:false });
+    base.push({ id:"driving",  name:"Driving Practice",            time:"morning"   });
+    base.push({ id:"deca",     name:"DECA Practice",               time:"morning"   });
+    base.push({ id:"fi2",      name:"First Impression + Outreach", time:"afternoon" });
+    base.push({ id:"workout",  name:"Workout",                     time:"afternoon" });
   }
-  base.push({ id:'done',    name:'Shower + Done',            sub:'Everything ends here',  tag:'routine',  done:false });
-  return base;
+  return base.map(t => ({ ...t, done: false }));
 }
 
-// ─── STREAK ───────────────────────────────────────────────────────────────────
-function getStreak() {
-  const hist = S.get(KEY_HIST) || [];
-  const today = todayStr();
-  let streak = 0;
-  const sorted = [...hist].sort((a,b) => b.date.localeCompare(a.date));
-  let prev = null;
-  for (const h of sorted) {
-    if (!prev) {
-      if (h.date === today || daysBetween(h.date, today) === 1) { streak = 1; prev = h.date; }
-      else break;
-    } else {
-      if (daysBetween(h.date, prev) === 1) { streak++; prev = h.date; }
-      else break;
+function Graph({ history }) {
+  const ref = useRef();
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth, H = canvas.offsetHeight;
+    canvas.width = W*dpr; canvas.height = H*dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0,0,W,H);
+    const pad = {l:24,r:8,t:8,b:20};
+    const gW = W-pad.l-pad.r, gH = H-pad.t-pad.b;
+    const days = [];
+    for (let i=13;i>=0;i--) {
+      const d = new Date(); d.setDate(d.getDate()-i);
+      const k = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const entry = history.find(h=>h.date===k);
+      days.push({ label: i===0?"Today":d.toLocaleDateString("en-US",{weekday:"short"}), score: entry?entry.score:null });
     }
-  }
-  return streak;
-}
-function daysBetween(a, b) {
-  const [ay,am,ad] = a.split('-').map(Number);
-  const [by,bm,bd] = b.split('-').map(Number);
-  const da = new Date(ay, am, ad), db = new Date(by, bm, bd);
-  return Math.round(Math.abs(db - da) / 86400000);
-}
-
-// ─── GRAPH ────────────────────────────────────────────────────────────────────
-function drawGraph() {
-  const canvas = document.getElementById('graph-canvas');
-  const dpr = window.devicePixelRatio || 1;
-  const W = canvas.offsetWidth, H = 120;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-
-  const hist = S.get(KEY_HIST) || [];
-  const today = todayStr();
-  const curScore = S.get(KEY_SCORE());
-
-  // Build 14-day window
-  const days = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const ds = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    const entry = hist.find(h => h.date === ds);
-    let sc = entry ? entry.score : null;
-    if (ds === today && curScore !== null) sc = curScore;
-    days.push({ label: i === 0 ? 'Today' : d.toLocaleDateString('en-US',{weekday:'short'}), score: sc });
-  }
-
-  const pad = { l: 28, r: 10, t: 10, b: 24 };
-  const gW = W - pad.l - pad.r, gH = H - pad.t - pad.b;
-
-  // Grid lines
-  ctx.strokeStyle = '#ebebeb'; ctx.lineWidth = 1;
-  [0,5,10].forEach(v => {
-    const y = pad.t + gH - (v/10)*gH;
-    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
-    ctx.fillStyle = '#aaaaaa'; ctx.font = `500 9px -apple-system,sans-serif`;
-    ctx.textAlign = 'right'; ctx.fillText(v, pad.l - 4, y + 3);
-  });
-
-  // Points with data
-  const pts = days.map((d, i) => ({
-    x: pad.l + (i / 13) * gW,
-    y: d.score !== null ? pad.t + gH - (d.score/10)*gH : null,
-    label: d.label, score: d.score
-  }));
-
-  // Area fill
-  const filled = pts.filter(p => p.y !== null);
-  if (filled.length > 1) {
-    ctx.beginPath();
-    ctx.moveTo(filled[0].x, pad.t + gH);
-    filled.forEach(p => ctx.lineTo(p.x, p.y));
-    ctx.lineTo(filled[filled.length-1].x, pad.t + gH);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(17,17,17,0.06)';
-    ctx.fill();
-  }
-
-  // Line
-  if (filled.length > 1) {
-    ctx.beginPath();
-    ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    filled.forEach((p,i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-    ctx.stroke();
-  }
-
-  // Dots + labels
-  pts.forEach((p, i) => {
-    if (i % 2 === 0 || i === 13) {
-      ctx.fillStyle = '#aaaaaa'; ctx.font = `500 8px -apple-system,sans-serif`;
-      ctx.textAlign = 'center'; ctx.fillText(p.label, p.x, H - 4);
+    ctx.strokeStyle="#ebebeb"; ctx.lineWidth=1;
+    [0,5,10].forEach(v=>{
+      const y=pad.t+gH-(v/10)*gH;
+      ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
+      ctx.fillStyle="#bbb"; ctx.font="500 8px -apple-system,sans-serif";
+      ctx.textAlign="right"; ctx.fillText(v,pad.l-3,y+3);
+    });
+    const pts = days.map((d,i)=>({ x:pad.l+(i/13)*gW, y:d.score!==null?pad.t+gH-(d.score/10)*gH:null, label:d.label }));
+    const filled = pts.filter(p=>p.y!==null);
+    if (filled.length>1) {
+      ctx.beginPath(); ctx.moveTo(filled[0].x,pad.t+gH);
+      filled.forEach(p=>ctx.lineTo(p.x,p.y));
+      ctx.lineTo(filled[filled.length-1].x,pad.t+gH); ctx.closePath();
+      ctx.fillStyle="rgba(17,17,17,0.07)"; ctx.fill();
+      ctx.beginPath(); ctx.strokeStyle="#111"; ctx.lineWidth=1.5; ctx.lineJoin="round"; ctx.lineCap="round";
+      filled.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y)); ctx.stroke();
     }
-    if (p.y !== null) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, i === 13 ? 4 : 2.5, 0, Math.PI*2);
-      ctx.fillStyle = i === 13 ? '#111' : '#555';
-      ctx.fill();
-    }
-  });
+    pts.forEach((p,i)=>{
+      if (i%2===0||i===13){ ctx.fillStyle="#bbb"; ctx.font="500 8px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText(p.label,p.x,H-3); }
+      if (p.y!==null){ ctx.beginPath(); ctx.arc(p.x,p.y,i===13?4:2.5,0,Math.PI*2); ctx.fillStyle=i===13?"#111":"#666"; ctx.fill(); }
+    });
+  }, [history]);
+  return <canvas ref={ref} style={{width:"100%",height:110,display:"block"}} />;
 }
 
-// ─── RENDER ───────────────────────────────────────────────────────────────────
-function renderAll() {
-  const h = new Date().getHours();
-  document.getElementById('tb-title').textContent =
-    h < 9 ? 'Rise up.' : h < 12 ? 'Lock in.' : h < 17 ? 'Keep going.' : h < 20 ? 'Finish strong.' : 'Rest earned.';
-
-  document.getElementById('streak-val').textContent = getStreak();
-
-  const sc = S.get(KEY_SCORE());
-  const scoreEl = document.getElementById('score-display');
-  const labelEl = document.getElementById('score-label');
-  const barEl   = document.getElementById('score-bar');
-  if (sc !== null) {
-    scoreEl.textContent = sc.toFixed(1);
-    barEl.style.width = (sc/10*100) + '%';
-    labelEl.textContent = sc >= 8 ? 'Crushing it 💪' : sc >= 6 ? 'Solid day' : sc >= 4 ? 'Room to push' : 'Get back on track';
-  } else {
-    scoreEl.textContent = '—';
-    barEl.style.width = '0%';
-    labelEl.textContent = 'No updates yet today';
-  }
-
-  const recText = S.get(KEY_REC);
-  const recCard = document.getElementById('rec-card');
-  if (recText) {
-    recCard.style.display = 'block';
-    document.getElementById('rec-text').textContent = recText;
-  } else {
-    recCard.style.display = 'none';
-  }
-
-  renderTasks();
-  renderChat();
-  drawGraph();
+// Parse Claude's sync command
+// Format Claude sends: SYNC score:7.2 done:walk,shower,act rec:"Do chess next"
+function parseSync(text) {
+  const result = { score: null, done: [], rec: "" };
+  const scoreMatch = text.match(/score:([\d.]+)/);
+  if (scoreMatch) result.score = parseFloat(scoreMatch[1]);
+  const doneMatch = text.match(/done:([\w,]+)/);
+  if (doneMatch) result.done = doneMatch[1].split(",").map(s=>s.trim()).filter(Boolean);
+  const recMatch = text.match(/rec:"([^"]+)"/);
+  if (recMatch) result.rec = recMatch[1];
+  return result;
 }
 
-function renderTasks() {
-  const list = document.getElementById('task-list');
-  if (!tasks.length) { list.innerHTML = '<div class="empty-hint">Tasks will appear here based on your day.</div>'; return; }
-  list.innerHTML = tasks.map(t => `
-    <div class="task-item${t.done?' done':''}" id="ti-${t.id}">
-      <div class="task-check">
-        <svg class="chk" width="10" height="8" viewBox="0 0 10 8" fill="none">
-          <path d="M1 3.5L3.5 6.5L9 1" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <div class="task-text">
-        <div class="task-name">${t.name}</div>
-        ${t.sub ? `<div class="task-sub">${t.sub}</div>` : ''}
-      </div>
-      <div class="task-tag">${t.tag}</div>
-    </div>
-  `).join('');
-}
+export default function App() {
+  const [tasks, setTasks]     = useState(() => LS.get(`tasks_${todayKey()}`) || getDayTasks());
+  const [history, setHistory] = useState(() => LS.get("lockin_history") || []);
+  const [score, setScore]     = useState(() => LS.get(`score_${todayKey()}`) ?? null);
+  const [rec, setRec]         = useState(() => LS.get("lockin_rec") || "");
+  const [syncInput, setSyncInput] = useState("");
+  const [syncMsg, setSyncMsg] = useState("");
+  const [showSync, setShowSync] = useState(false);
 
-function renderChat() {
-  const log = document.getElementById('chat-log');
-  if (!chat.length) {
-    log.innerHTML = `<div class="empty-hint">Tell me what you've been up to — I'll adjust your tasks, score your day, and tell you what to do next.</div>`;
-    return;
-  }
-  log.innerHTML = chat.map(m => `
-    <div class="msg-${m.role}">
-      ${m.text}
-      <div class="msg-time">${m.time}</div>
-    </div>
-  `).join('');
-  setTimeout(() => {
-    const sb = document.getElementById('scroll-body');
-    sb.scrollTop = sb.scrollHeight;
-  }, 50);
-}
+  useEffect(()=>{ LS.set(`tasks_${todayKey()}`,tasks); },[tasks]);
+  useEffect(()=>{ LS.set("lockin_history",history); },[history]);
+  useEffect(()=>{ LS.set(`score_${todayKey()}`,score); },[score]);
+  useEffect(()=>{ LS.set("lockin_rec",rec); },[rec]);
 
-// ─── SEND MESSAGE (OPENROUTER HANDLING) ───────────────────────────────────────
-async function sendMessage() {
-  const input = document.getElementById('msg-input');
-  const text = input.value.trim();
-  if (!text || sending) return;
-
-  // Custom diagnostic override
-  if (text === '/clearkey') {
-    localStorage.removeItem('user_gemini_key');
-    alert("Saved API key cleared. Refresh your page.");
-    input.value = '';
-    return;
-  }
-
-  // Retrieve or request the user's OpenRouter key securely at runtime
-  let OPENROUTER_API_KEY = localStorage.getItem('user_gemini_key');
-  if (!OPENROUTER_API_KEY) {
-    OPENROUTER_API_KEY = prompt("Please enter your OpenRouter API Key (Starts with sk-or-v1):");
-    if (OPENROUTER_API_KEY) {
-      localStorage.setItem('user_gemini_key', OPENROUTER_API_KEY.trim());
-    } else {
-      alert("An API key is required to connect to the AI coach.");
-      return;
-    }
-  }
-
-  sending = true;
-  document.getElementById('send-btn').disabled = true;
-  input.value = '';
-  input.style.height = 'auto';
-
-  const now = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-  chat.push({ role:'user', text, time: now });
-  S.set(KEY_CHAT(), chat);
-  renderChat();
-
-  const log = document.getElementById('chat-log');
-  const typingEl = document.createElement('div');
-  typingEl.className = 'msg-ai';
-  typingEl.id = 'typing';
-  typingEl.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
-  log.appendChild(typingEl);
-  document.getElementById('scroll-body').scrollTop = 99999;
-
-  try {
-    const systemPrompt = buildSystemPrompt();
-    
-    // Format history for OpenRouter (Standard OpenAI structural format)
-    const messages = [{ role: 'system', content: systemPrompt }];
-    chat.slice(-10, -1).forEach(m => {
-      messages.push({
-        role: m.role === 'user' ? 'user' : 'assistant',
-        content: m.text
+  function applySync() {
+    const parsed = parseSync(syncInput);
+    let changed = false;
+    if (parsed.score !== null) {
+      const s = Math.min(10, Math.max(0, parsed.score));
+      setScore(s);
+      setHistory(prev => {
+        const next = [...prev];
+        const idx = next.findIndex(h=>h.date===todayKey());
+        if (idx>=0) next[idx].score=s; else next.push({date:todayKey(),score:s});
+        return next;
       });
-    });
-    messages.push({ role: 'user', content: text });
-
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'HTTP-Referer': window.location.href,
-        'X-Title': 'Lock In Tracker'
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: messages,
-        response_format: { type: 'json_object' }
-      })
-    });
-    
-    const data = await res.json();
-
-    // Catch API errors directly from OpenRouter and show them in chat
-    if (data.error) {
-      typingEl.remove();
-      chat.push({ role:'ai', text: `OpenRouter Error: ${data.error.message || JSON.stringify(data.error)}`, time: now });
-      S.set(KEY_CHAT(), chat);
-      renderChat();
-      sending = false;
-      document.getElementById('send-btn').disabled = false;
-      return;
+      changed = true;
     }
-
-    const raw = data.choices?.[0]?.message?.content || '';
-
-    let parsed;
-    try {
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-    } catch { parsed = null; }
-
-    typingEl.remove();
-
-    if (parsed) {
-      if (parsed.score !== undefined && parsed.score !== null) {
-        const newScore = Math.min(10, Math.max(0, parseFloat(parsed.score)));
-        S.set(KEY_SCORE(), newScore);
-        const hist = S.get(KEY_HIST) || [];
-        const existing = hist.findIndex(h => h.date === todayStr());
-        if (existing >= 0) hist[existing].score = newScore;
-        else hist.push({ date: todayStr(), score: newScore });
-        S.set(KEY_HIST, hist);
-        score = newScore;
-      }
-
-      if (parsed.completedTasks && Array.isArray(parsed.completedTasks)) {
-        parsed.completedTasks.forEach(id => {
-          const t = tasks.find(t => t.id === id);
-          if (t) t.done = true;
-        });
-      }
-      if (parsed.addedTasks && Array.isArray(parsed.addedTasks)) {
-        parsed.addedTasks.forEach(t => {
-          if (!tasks.find(x => x.id === t.id)) tasks.push({ ...t, done: false });
-        });
-      }
-      if (parsed.removedTasks && Array.isArray(parsed.removedTasks)) {
-        tasks = tasks.filter(t => !parsed.removedTasks.includes(t.id));
-      }
-      S.set(KEY_TASKS(), tasks);
-
-      if (parsed.recommendation) S.set(KEY_REC, parsed.recommendation);
-
-      const reply = parsed.message || 'Got it.';
-      chat.push({ role:'ai', text: reply, time: now });
-    } else {
-      chat.push({ role:'ai', text: raw || 'Error: Model did not return data in the correct format.', time: now });
+    if (parsed.done.length) {
+      setTasks(prev => prev.map(t => parsed.done.includes(t.id) ? {...t,done:true} : t));
+      changed = true;
     }
-
-    S.set(KEY_CHAT(), chat);
-    renderAll();
-  } catch (e) {
-    typingEl.remove();
-    chat.push({ role:'ai', text: 'Something went wrong — check your connection or key and try again.', time: now });
-    S.set(KEY_CHAT(), chat);
-    renderChat();
+    if (parsed.rec) { setRec(parsed.rec); changed = true; }
+    setSyncMsg(changed ? "✓ Updated!" : "Nothing to update — check the format.");
+    setSyncInput("");
+    setTimeout(()=>{ setSyncMsg(""); setShowSync(false); },2000);
   }
 
-  sending = false;
-  document.getElementById('send-btn').disabled = false;
+  function resetDay() {
+    const fresh = getDayTasks();
+    setTasks(fresh);
+    setScore(null);
+    setRec("");
+    LS.set(`tasks_${todayKey()}`, fresh);
+    LS.set(`score_${todayKey()}`, null);
+    LS.set("lockin_rec", "");
+  }
+
+  function getStreak() {
+    const today = todayKey();
+    let streak=0, prev=null;
+    const sorted=[...history].sort((a,b)=>b.date.localeCompare(a.date));
+    for (const h of sorted) {
+      const daysDiff = (a,b)=>{ const p=s=>{const[y,m,d]=s.split("-").map(Number);return new Date(y,m,d);}; return Math.round(Math.abs(p(b)-p(a))/86400000); };
+      if (!prev){ if(h.date===today||daysDiff(h.date,today)===1){streak=1;prev=h.date;}else break; }
+      else{ if(daysDiff(h.date,prev)===1){streak++;prev=h.date;}else break; }
+    }
+    return streak;
+  }
+
+  const dow = new Date().getDay();
+  const dayName = DOW[dow];
+  const isACT = [1,2,3].includes(dow);
+  const streak = getStreak();
+  const h = new Date().getHours();
+  const titleText = h<9?"Rise up.":h<12?"Lock in.":h<17?"Keep going.":h<20?"Finish strong.":"Rest earned.";
+  const scoreLabel = score===null?"Send Claude an update below":score>=8?"Crushing it 💪":score>=6?"Solid day":score>=4?"Room to push":"Get back on track";
+  const doneTasks = tasks.filter(t=>t.done).length;
+  const C = { bg:"#fff",card:"#f7f7f7",border:"#ebebeb",text:"#111",dim:"#555",muted:"#aaa",black:"#111" };
+
+  return (
+    <div style={{background:C.bg,minHeight:"100vh",fontFamily:"-apple-system,'Helvetica Neue',sans-serif",color:C.text,maxWidth:480,margin:"0 auto",paddingBottom:32}}>
+
+      {/* Header */}
+      <div style={{padding:"20px 20px 14px",borderBottom:`1px solid ${C.border}`,background:"#fff"}}>
+        <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",color:C.muted,marginBottom:2}}>Summer Lock-In</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:22,fontWeight:800,letterSpacing:"-0.03em"}}>{titleText}</div>
+          <div style={{display:"flex",alignItems:"center",gap:6,background:C.black,color:"#fff",borderRadius:99,padding:"6px 13px"}}>
+            <span>🔥</span>
+            <span style={{fontSize:15,fontWeight:800}}>{streak}</span>
+            <span style={{fontSize:10,color:"#888",fontWeight:600}}>streak</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Score */}
+      <div style={{padding:"22px 20px 0"}}>
+        <div style={{display:"flex",alignItems:"flex-end",gap:8,marginBottom:4}}>
+          <div style={{fontSize:60,fontWeight:800,letterSpacing:"-0.05em",lineHeight:1}}>
+            {score!==null ? parseFloat(score).toFixed(1) : "—"}
+          </div>
+          <div style={{fontSize:18,fontWeight:600,color:C.muted,marginBottom:6}}>/10</div>
+        </div>
+        <div style={{fontSize:13,color:C.dim}}>{scoreLabel}</div>
+        <div style={{height:3,background:C.border,borderRadius:99,marginTop:12,overflow:"hidden"}}>
+          <div style={{height:"100%",background:C.black,borderRadius:99,width:`${score!==null?(score/10*100):0}%`,transition:"width 0.6s cubic-bezier(.4,0,.2,1)"}}/>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,padding:"16px 20px 0"}}>
+        {[
+          {label:"Tasks done", value:`${doneTasks}/${tasks.length}`},
+          {label:"Today", value:dayName},
+        ].map(s=>(
+          <div key={s.label} style={{background:C.card,border:`1.5px solid ${C.border}`,borderRadius:13,padding:"12px 14px"}}>
+            <div style={{fontSize:20,fontWeight:800,letterSpacing:"-0.03em"}}>{s.value}</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Graph */}
+      <div style={{padding:"20px 20px 0"}}>
+        <div style={{height:1,background:C.border,marginBottom:16}}/>
+        <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.muted,marginBottom:10}}>Productivity — 14 days</div>
+        <Graph history={history}/>
+      </div>
+
+      {/* Rec */}
+      {rec && (
+        <div style={{margin:"16px 20px 0",background:C.black,color:"#fff",borderRadius:14,padding:"14px 16px"}}>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:"#555",marginBottom:5}}>Up next</div>
+          <div style={{fontSize:13,fontWeight:500,lineHeight:1.6,color:"#ddd"}}>{rec}</div>
+        </div>
+      )}
+
+      {/* Tasks */}
+      <div style={{padding:"20px 20px 0"}}>
+        <div style={{height:1,background:C.border,marginBottom:16}}/>
+        <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.muted,marginBottom:10}}>Today's tasks</div>
+        {tasks.map(t=>(
+          <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 13px",background:C.card,border:`1.5px solid ${C.border}`,borderRadius:12,marginBottom:6,opacity:t.done?0.4:1,transition:"opacity 0.2s"}}>
+            <div style={{width:18,height:18,borderRadius:"50%",border:`1.5px solid ${t.done?C.black:C.border}`,background:t.done?C.black:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              {t.done&&<svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3L3.5 5.5L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:600,textDecoration:t.done?"line-through":"none",letterSpacing:"-0.01em"}}>{t.name}</div>
+              <div style={{fontSize:11,color:C.muted}}>{t.time}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* How to use */}
+      <div style={{margin:"20px 20px 0",background:C.card,border:`1.5px solid ${C.border}`,borderRadius:14,padding:"14px 16px"}}>
+        <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",color:C.muted,marginBottom:8}}>How to use</div>
+        <div style={{fontSize:13,color:C.dim,lineHeight:1.7}}>
+          1. Tell Claude what you've done in the chat below<br/>
+          2. Claude responds with a <strong>SYNC command</strong><br/>
+          3. Tap <strong>"Sync Update"</strong> and paste it in<br/>
+          4. Your score, tasks and graph update instantly
+        </div>
+      </div>
+
+      {/* Sync button */}
+      <div style={{padding:"16px 20px 0"}}>
+        <button
+          onClick={()=>setShowSync(s=>!s)}
+          style={{width:"100%",background:C.black,color:"#fff",border:"none",borderRadius:12,padding:"13px",fontSize:14,fontWeight:700,cursor:"pointer",letterSpacing:"-0.01em"}}
+        >
+          {showSync ? "Cancel" : "⚡ Sync Update from Claude"}
+        </button>
+
+        {showSync && (
+          <div style={{marginTop:10}}>
+            <textarea
+              value={syncInput}
+              onChange={e=>setSyncInput(e.target.value)}
+              placeholder={'Paste Claude\'s SYNC command here...\ne.g. SYNC score:7.2 done:walk,shower,act rec:"Do chess next"'}
+              rows={4}
+              style={{width:"100%",background:C.card,border:`1.5px solid ${C.border}`,borderRadius:12,padding:"12px 14px",fontSize:13,fontFamily:"monospace",color:C.text,resize:"none",outline:"none",lineHeight:1.5}}
+            />
+            <button
+              onClick={applySync}
+              style={{width:"100%",marginTop:8,background:"#111",color:"#fff",border:"none",borderRadius:12,padding:"12px",fontSize:14,fontWeight:700,cursor:"pointer"}}
+            >
+              Apply
+            </button>
+            {syncMsg && <div style={{textAlign:"center",marginTop:8,fontSize:13,fontWeight:600,color:syncMsg.startsWith("✓")?"#111":C.muted}}>{syncMsg}</div>}
+          </div>
+        )}
+      </div>
+
+      {/* Reset */}
+      <div style={{padding:"12px 20px 0",textAlign:"center"}}>
+        <button onClick={resetDay} style={{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer",textDecoration:"underline"}}>Reset today's tasks</button>
+      </div>
+
+    </div>
+  );
 }
-
-// ─── PROMPT BUILDERS FOR THE AGENT ─────────────────────────────────────────────
-function buildSystemPrompt() {
-  const dow = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
-  const isACT = ['Monday','Tuesday','Wednesday'].includes(dow);
-  const taskList = tasks.map(t => `- [${t.done?'x':' '}] ${t.id}: ${t.name} (${t.tag})`).join('\n');
-  const curScore = S.get(KEY_SCORE());
-
-  return `You are a sharp, direct productivity coach for Vihaan, a 15-year-old high school junior in Ohio locked in for the summer. He is targeting a 35 ACT, building a nonprofit called First Impression, pursuing a co-authored research paper with a UC professor, and aiming for top colleges (Harvard, Princeton, Johns Hopkins, CMU). He does chess, DECA, Boy Scouts (Eagle Scout track), guitar, soccer, and referees.
-
-Today is ${dow}. ${isACT ? 'ACT class day (9–11am, leaves 8:45, back 11:20).' : ''}
-Current productivity score: ${curScore !== null ? curScore : 'not set yet'}/10
-Current tasks:
-${taskList}
-
-Your job: When Vihaan tells you what he's done or what's happening, respond with a JSON object ONLY — no markdown wrappers, no text outside it. The JSON must have these keys:
-- "message": string — your response (2-4 sentences, direct, coach-like, no fluff, reference specifics)
-- "score": number or null — updated productivity score 0-10 with one decimal (e.g. 7.4). Be honest — a great day where he did everything is 9-10, average is 5-6, skipped key stuff is 3-4. Null if not enough info yet.
-- "completedTasks": array of task IDs to mark done based on what he said
-- "addedTasks": array of new task objects {id, name, sub, tag, done:false} if he mentions new events/activities
-- "removedTasks": array of task IDs to remove if he says something is cancelled/skipped for good reason
-- "recommendation": string — what he should do next / before his next update (1-2 sentences, specific)
-
-Scoring rubric (rough guide):
-- 9-10: Nailed everything, workout done, ACT review done, passion project output
-- 7-8: Most things done, minor slips
-- 5-6: Decent but key blocks missed
-- 3-4: Significant misses
-- 1-2: Barely anything
-
-Be real with him. Don't sugarcoat a bad day. If he's crushing it, say so. Keep it short and punchy.`;
-}
-</script>
-</body>
-</html>
